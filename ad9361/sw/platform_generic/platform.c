@@ -40,17 +40,133 @@
 /******************************************************************************/
 /***************************** Include Files **********************************/
 /******************************************************************************/
-#include "stdint.h"
 #include "../util.h"
 #include "platform.h"
+#include <stdio.h>
 
-/***************************************************************************//**
- * @brief usleep
-*******************************************************************************/
-static inline void usleep(unsigned long usleep)
-{
+#include <unistd.h>
+#include <assert.h>
+#include <stdint.h>
+#include <fcntl.h>
+#include <termios.h>
+#include <stdlib.h>
+#include <poll.h>
+#include <string.h>
 
+typedef struct pollfd pollfd;
+typedef int16_t s16;
+typedef int32_t s32;
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef uint8_t u8;
+typedef uint64_t u64;
+
+int ttyFD = -1;
+
+
+void drainfd(int fd) {
+	pollfd pfd;
+	pfd.fd = fd;
+	pfd.events = POLLIN;
+	while(poll(&pfd,1,0)>0) {
+		if(!(pfd.revents&POLLIN)) continue;
+		char buf[4096];
+		read(fd,buf,sizeof(buf));
+	}
 }
+
+int writeAll(int fd,void* buf, int len) {
+	u8* buf1=(u8*)buf;
+	int off=0;
+	int r;
+	while(off<len) {
+		if((r=write(fd,buf1+off,len-off))<=0) break;
+		off+=r;
+	}
+	return off;
+}
+
+int readAll(int fd,void* buf, int len) {
+	u8* buf1=(u8*)buf;
+	int off=0;
+	int r;
+	while(off<len) {
+		if((r=read(fd,buf1+off,len-off))<=0) break;
+		off+=r;
+	}
+	return off;
+}
+
+void concat(u8* buf, int& index, u8* data, int len) {
+	memcpy(buf+index, data, len);
+	index += len;
+}
+
+
+void spiTransaction(u8* din, u8* dout, int bytes) {
+	// bit pattern:
+	// smp 0 0 0 0 sdi cs clk
+	
+	// pull down cs pin
+	u8 buf[256] = {
+		0b00000010,
+		0b00000010,
+		0b00000010,
+		0b00000000,
+		0b00000000,
+		0b00000000,
+		0b00000000
+	};
+	int index = 7;
+	
+	// send data bits and sample dout bits
+	for(int b=0;b<bytes;b++) {
+		u8 byte = din[b];
+		for(int i=0;i<8;i++) {
+			u32 bit = byte>>7;
+			u8 tmp[4] = {
+				0b00000001,
+				0b10000000		// MSB of 1 means to sample gpio inputs
+			};
+			tmp[0] |= bit<<2;
+			tmp[1] |= bit<<2;
+			tmp[2] |= bit<<2;
+			tmp[3] |= bit<<2;
+			concat(buf, index, tmp, sizeof(tmp));
+			byte <<= 1;
+		}
+	}
+	
+	// release cs pin
+	{
+		u8 tmp[7] = {
+			0b00000000,
+			0b00000000,
+			0b00000000,
+			0b00000000,
+			0b00000010,
+			0b00000010,
+			0b00000010,
+		};
+		concat(buf, index, tmp, sizeof(tmp));
+	}
+	
+	// write commands to tty device
+	assert(writeAll(ttyFD, buf, index) == index);
+	
+	// read back data
+	u8 buf2[bytes*8];
+	assert(readAll(ttyFD,buf2,sizeof(buf2)) == (int)sizeof(buf2));
+	for(int i=0;i<bytes;i++) {
+		u8 byte=0;
+		for(int j=0;j<8;j++) {
+			u8 bit = (buf2[i*8+j] & 0b1000)?1:0;
+			byte = (byte<<1) | bit;
+		}
+		dout[i] = byte;
+	}
+}
+
 
 /***************************************************************************//**
  * @brief spi_init
@@ -59,25 +175,77 @@ int32_t spi_init(uint32_t device_id,
 				 uint8_t  clk_pha,
 				 uint8_t  clk_pol)
 {
+	ttyFD = open("/dev/ttyACM0",O_RDWR);
+	if(ttyFD<0) {
+		perror("open tty");
+		return -1;
+	}
+	
+	struct termios tc;
+	
+	/* Set TTY mode. */
+	if (tcgetattr(ttyFD, &tc) < 0) {
+		perror("tcgetattr");
+		return 0;
+	}
+	tc.c_iflag &= ~(INLCR|IGNCR|ICRNL|IGNBRK|IUCLC|INPCK|ISTRIP|IXON|IXOFF|IXANY);
+	tc.c_oflag &= ~OPOST;
+	tc.c_cflag &= ~(CSIZE|CSTOPB|PARENB|PARODD|CRTSCTS);
+	tc.c_cflag |= CS8 | CREAD | CLOCAL;
+	tc.c_lflag &= ~(ICANON|ECHO|ECHOE|ECHOK|ECHONL|ISIG|IEXTEN);
+	tc.c_cc[VMIN] = 1;
+	tc.c_cc[VTIME] = 0;
+	if (tcsetattr(ttyFD, TCSANOW, &tc) < 0) {
+		perror("tcsetattr");
+	}
+	
+	u8 buf[2] = {
+		0b00000010,
+		0b00000010,
+	};
+	assert(writeAll(ttyFD, buf, sizeof(buf)) == (int)sizeof(buf));
+	
+	usleep(10000);
+	drainfd(ttyFD);
 	return 0;
+}
+
+void spi_deinit() {
+	u8 buf[2] = {
+		0b00001010,
+		0b00001010,
+	};
+	assert(writeAll(ttyFD, buf, sizeof(buf)) == (int)sizeof(buf));
 }
 
 /***************************************************************************//**
  * @brief spi_read
+ * Perform a spi transaction of bytes_number total bytes, with sdi data supplied 
+ * in data and sdo data also written back to data
 *******************************************************************************/
 int32_t spi_read(uint8_t *data,
 				 uint8_t bytes_number)
 {
+	fprintf(stderr, "spi_read %d\n", bytes_number);
+	spiTransaction(data, data, bytes_number);
 	return 0;
 }
 
 /***************************************************************************//**
  * @brief spi_write_then_read
+ * Perform a spi transaction of n_tx+n_rx bytes total, with the first n_tx bytes
+ * sdi supplied from txbuf, and with the last n_rx bytes sdo written into rxbuf
 *******************************************************************************/
 int spi_write_then_read(struct spi_device *spi,
 		const unsigned char *txbuf, unsigned n_tx,
 		unsigned char *rxbuf, unsigned n_rx)
 {
+	//fprintf(stderr, "spi_write_then_read %d, %d\n", n_tx, n_rx);
+	u8 buf[n_tx+n_rx];
+	memset(buf,0,sizeof(buf));
+	memcpy(buf, txbuf, n_tx);
+	spiTransaction(buf, buf, n_tx+n_rx);
+	memcpy(rxbuf, buf+n_tx, n_rx);
 	return 0;
 }
 
