@@ -5244,6 +5244,7 @@ int32_t ad9361_setup(struct ad9361_rf_phy *phy)
 			ret);
 		return ret;
 	}
+	printf("set rx lo freq %lld\n", pd->rx_synth_freq);
 
 	ret = clk_prepare_enable(phy->clks[RX_REFCLK]);
 	if (ret < 0) {
@@ -6812,8 +6813,9 @@ int32_t ad9361_rfpll_set_rate(struct refclk_scale *clk_priv, uint32_t rate)
 			else
 				ad9361_rfpll_dummy_set_rate(phy->ref_clk_scale[RX_RFPLL_DUMMY], rate);
 		} else {
-			ad9361_rfpll_int_set_rate(phy->ref_clk_scale[RX_RFPLL_INT], rate,
+			ret = ad9361_rfpll_int_set_rate(phy->ref_clk_scale[RX_RFPLL_INT], rate,
 					phy->clks[phy->ref_clk_scale[RX_RFPLL_INT]->parent_source]->rate);
+			if (ret < 0) return ret;
 		}
 		/* Load Gain Table */
 		ret = ad9361_load_gt(phy, ad9361_from_clk(rate), GT_RX1 + GT_RX2);
@@ -6827,8 +6829,9 @@ int32_t ad9361_rfpll_set_rate(struct refclk_scale *clk_priv, uint32_t rate)
 			else
 				ad9361_rfpll_dummy_set_rate(phy->ref_clk_scale[TX_RFPLL_DUMMY], rate);
 		} else {
-			ad9361_rfpll_int_set_rate(phy->ref_clk_scale[TX_RFPLL_INT], rate,
+			ret = ad9361_rfpll_int_set_rate(phy->ref_clk_scale[TX_RFPLL_INT], rate,
 					phy->clks[phy->ref_clk_scale[TX_RFPLL_INT]->parent_source]->rate);
+			if (ret < 0) return ret;
 		}
 		/* For RX LO we typically have the tracking option enabled
 		* so for now do nothing here.

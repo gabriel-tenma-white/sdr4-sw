@@ -55,6 +55,8 @@
 #include "adc_core.h"
 #include "dac_core.h"
 #endif
+#include <assert.h>
+#include <string.h>
 
 /******************************************************************************/
 /************************ Variables Definitions *******************************/
@@ -81,7 +83,7 @@ AD9361_InitParam default_init_param = {
 	/* Reference Clock */
 	40000000UL,	//reference_clk_rate
 	/* Base Configuration */
-	1,		//two_rx_two_tx_mode_enable *** adi,2rx-2tx-mode-enable
+	0,		//two_rx_two_tx_mode_enable *** adi,2rx-2tx-mode-enable
 	1,		//one_rx_one_tx_mode_use_rx_num *** adi,1rx-1tx-mode-use-rx-num
 	1,		//one_rx_one_tx_mode_use_tx_num *** adi,1rx-1tx-mode-use-tx-num
 	1,		//frequency_division_duplex_mode_enable *** adi,frequency-division-duplex-mode-enable
@@ -105,23 +107,25 @@ AD9361_InitParam default_init_param = {
 	/* ENSM Control */
 	0,		//ensm_enable_pin_pulse_mode_enable *** adi,ensm-enable-pin-pulse-mode-enable
 	0,		//ensm_enable_txnrx_control_enable *** adi,ensm-enable-txnrx-control-enable
+	0,		//tx_lo_powerdown_managed_enable
 	/* LO Control */
-	2400000000UL,	//rx_synthesizer_frequency_hz *** adi,rx-synthesizer-frequency-hz
-	2400000000UL,	//tx_synthesizer_frequency_hz *** adi,tx-synthesizer-frequency-hz
-	1,				//tx_lo_powerdown_managed_enable *** adi,tx-lo-powerdown-managed-enable
+	100000000UL,	//rx_synthesizer_frequency_hz *** adi,rx-synthesizer-frequency-hz
+	903700000UL,	//tx_synthesizer_frequency_hz *** adi,tx-synthesizer-frequency-hz
 	/* Rate & BW Control */
-	{983040000, 245760000, 122880000, 61440000, 30720000, 30720000},// rx_path_clock_frequencies[6] *** adi,rx-path-clock-frequencies
-	{983040000, 122880000, 122880000, 61440000, 30720000, 30720000},// tx_path_clock_frequencies[6] *** adi,tx-path-clock-frequencies
-	18000000,//rf_rx_bandwidth_hz *** adi,rf-rx-bandwidth-hz
-	18000000,//rf_tx_bandwidth_hz *** adi,rf-tx-bandwidth-hz
+	{983040000, 245760000, 122880000, 61440000, 30720000, 15360000},// rx_path_clock_frequencies[6] *** adi,rx-path-clock-frequencies
+	{983040000, 122880000, 122880000, 61440000, 30720000, 15360000},// tx_path_clock_frequencies[6] *** adi,tx-path-clock-frequencies
+	//{30720000, 15360000, 15360000, 15360000, 15360000, 15360000},// rx_path_clock_frequencies[6] *** adi,rx-path-clock-frequencies
+	//{30720000, 15360000, 15360000, 15360000, 15360000, 15360000},// tx_path_clock_frequencies[6] *** adi,tx-path-clock-frequencies
+	0,//rf_rx_bandwidth_hz *** adi,rf-rx-bandwidth-hz
+	0,//rf_tx_bandwidth_hz *** adi,rf-tx-bandwidth-hz
 	/* RF Port Control */
 	0,		//rx_rf_port_input_select *** adi,rx-rf-port-input-select
 	0,		//tx_rf_port_input_select *** adi,tx-rf-port-input-select
 	/* TX Attenuation Control */
-	10000,	//tx_attenuation_mdB *** adi,tx-attenuation-mdB
+	0,		//tx_attenuation_mdB *** adi,tx-attenuation-mdB
 	0,		//update_tx_gain_in_alert_enable *** adi,update-tx-gain-in-alert-enable
 	/* Reference Clock Control */
-	0,		//xo_disable_use_ext_refclk_enable *** adi,xo-disable-use-ext-refclk-enable
+	1,		//xo_disable_use_ext_refclk_enable *** adi,xo-disable-use-ext-refclk-enable
 	{8, 5920},	//dcxo_coarse_and_fine_tune[2] *** adi,dcxo-coarse-and-fine-tune
 	CLKOUT_DISABLE,	//clk_output_mode_select *** adi,clk-output-mode-select
 	/* Gain Control */
@@ -222,7 +226,7 @@ AD9361_InitParam default_init_param = {
 	/* Temperature Sensor Control */
 	256,	//temp_sense_decimation *** adi,temp-sense-decimation
 	1000,	//temp_sense_measurement_interval_ms *** adi,temp-sense-measurement-interval-ms
-	0xCE,	//temp_sense_offset_signed *** adi,temp-sense-offset-signed
+	-50,	//temp_sense_offset_signed *** adi,temp-sense-offset-signed
 	1,		//temp_sense_periodic_measurement_enable *** adi,temp-sense-periodic-measurement-enable
 	/* Control Out Setup */
 	0xFF,	//ctrl_outs_enable_mask *** adi,ctrl-outs-enable-mask
@@ -250,14 +254,14 @@ AD9361_InitParam default_init_param = {
 	0,		//fdd_rx_rate_2tx_enable *** adi,fdd-rx-rate-2tx-enable
 	0,		//swap_ports_enable *** adi,swap-ports-enable
 	0,		//single_data_rate_enable *** adi,single-data-rate-enable
-	1,		//lvds_mode_enable *** adi,lvds-mode-enable
+	0,		//lvds_mode_enable *** adi,lvds-mode-enable
 	0,		//half_duplex_mode_enable *** adi,half-duplex-mode-enable
 	0,		//single_port_mode_enable *** adi,single-port-mode-enable
-	0,		//full_port_enable *** adi,full-port-enable
+	1,		//full_port_enable *** adi,full-port-enable
 	0,		//full_duplex_swap_bits_enable *** adi,full-duplex-swap-bits-enable
 	0,		//delay_rx_data *** adi,delay-rx-data
 	0,		//rx_data_clock_delay *** adi,rx-data-clock-delay
-	4,		//rx_data_delay *** adi,rx-data-delay
+	60,		//rx_data_delay *** adi,rx-data-delay
 	7,		//tx_fb_clock_delay *** adi,tx-fb-clock-delay
 	0,		//tx_data_delay *** adi,tx-data-delay
 #ifdef ALTERA_PLATFORM
@@ -309,15 +313,15 @@ AD9361_InitParam default_init_param = {
 	-1,		//gpio_cal_sw1 *** cal-sw1-gpios
 	-1,		//gpio_cal_sw2 *** cal-sw2-gpios
 	/* External LO clocks */
-	NULL,	//(*ad9361_rfpll_ext_recalc_rate)()
-	NULL,	//(*ad9361_rfpll_ext_round_rate)()
-	NULL	//(*ad9361_rfpll_ext_set_rate)()
+	nullptr,	//(*ad9361_rfpll_ext_recalc_rate)()
+	nullptr,	//(*ad9361_rfpll_ext_round_rate)()
+	nullptr	//(*ad9361_rfpll_ext_set_rate)()
 };
 
 AD9361_RXFIRConfig rx_fir_config = {	// BPF PASSBAND 3/20 fs to 1/4 fs
 	3, // rx
 	0, // rx_gain
-	1, // rx_dec
+	2, // rx_dec
 	{-4, -6, -37, 35, 186, 86, -284, -315,
 	 107, 219, -4, 271, 558, -307, -1182, -356,
 	 658, 157, 207, 1648, 790, -2525, -2553, 748,
@@ -336,7 +340,7 @@ AD9361_RXFIRConfig rx_fir_config = {	// BPF PASSBAND 3/20 fs to 1/4 fs
 	 0, 0, 0, 0, 0, 0, 0, 0}, // rx_coef[128]
 	 64, // rx_coef_size
 	 {0, 0, 0, 0, 0, 0}, //rx_path_clks[6]
-	 0 // rx_bandwidth
+	 1000000 // rx_bandwidth
 };
 
 AD9361_TXFIRConfig tx_fir_config = {	// BPF PASSBAND 3/20 fs to 1/4 fs
@@ -367,6 +371,8 @@ struct ad9361_rf_phy *ad9361_phy;
 #ifdef FMCOMMS5
 struct ad9361_rf_phy *ad9361_phy_b;
 #endif
+
+void spi_deinit();
 
 /***************************************************************************//**
  * @brief main
@@ -425,10 +431,30 @@ int main(void)
 	default_init_param.digital_interface_tune_fir_disable = 1;
 #endif
 
-	ad9361_init(&ad9361_phy, &default_init_param);
 
-	ad9361_set_tx_fir_config(ad9361_phy, tx_fir_config);
-	ad9361_set_rx_fir_config(ad9361_phy, rx_fir_config);
+	double taps[] = {-9.677588241174817e-05, 5.1934071962023154e-05, 0.0002417911309748888, -5.46347837371286e-05, -0.000471300445497036, 3.659113262557429e-18, 0.0007989470032043755, 0.00015856450772844255, -0.0012279481161385775, -0.00047998057561926544, 0.0017454639310017228, 0.0010331198573112488, -0.0023169436026364565, -0.001892575528472662, 0.0028810056392103434, 0.00313270534388721, -0.0033453600481152534, -0.00482031237334013, 0.0035841146018356085, 0.007006558123975992, -0.003436473896726966, -0.009718895889818668, 0.0027063237503170967, 0.01295391097664833, -0.0011613656533882022, -0.016671979799866676, -0.0014708671951666474, 0.020794542506337166, 0.005515177268534899, -0.0252046100795269, -0.01137898862361908, 0.029750775545835495, 0.019621847197413445, -0.03425469994544983, -0.03111439198255539, 0.038521647453308105, 0.04742412269115448, -0.04235324636101723, -0.07187691330909729, 0.04556142911314964, 0.11317645758390427, -0.047982316464185715, -0.20350009202957153, 0.049488719552755356, 0.633681058883667, 0.9500008821487427, 0.633681058883667, 0.049488719552755356, -0.20350009202957153, -0.047982316464185715, 0.11317645758390427, 0.04556142911314964, -0.07187691330909729, -0.04235324636101723, 0.04742412269115448, 0.038521647453308105, -0.03111439198255539, -0.03425469994544983, 0.019621847197413445, 0.029750775545835495, -0.01137898862361908, -0.0252046100795269, 0.005515177268534899, 0.020794542506337166, -0.0014708671951666474, -0.016671979799866676, -0.0011613656533882022, 0.01295391097664833, 0.0027063237503170967, -0.009718895889818668, -0.003436473896726966, 0.007006558123975992, 0.0035841146018356085, -0.00482031237334013, -0.0033453600481152534, 0.00313270534388721, 0.0028810056392103434, -0.001892575528472662, -0.0023169436026364565, 0.0010331198573112488, 0.0017454639310017228, -0.00047998057561926544, -0.0012279481161385775, 0.00015856450772844255, 0.0007989470032043755, 3.659113262557429e-18, -0.000471300445497036, -5.46347837371286e-05, 0.0002417911309748888, 5.1934071962023154e-05, -9.677588241174817e-05};
+	int ntaps = sizeof(taps)/sizeof(*taps);
+	
+	memset(rx_fir_config.rx_coef, 0, sizeof(rx_fir_config.rx_coef));
+	rx_fir_config.rx_coef_size = 96;
+	for(int i=0;i<ntaps; i++)
+		rx_fir_config.rx_coef[i] = int16_t(taps[i]*32767);
+	
+
+	default_init_param.rx_synthesizer_frequency_hz = uint64_t(100. * 1000000);
+	default_init_param.tx_synthesizer_frequency_hz = uint64_t(5800ll * 1000000);
+	default_init_param.rf_rx_bandwidth_hz = 5000 * 1000;
+	default_init_param.rf_tx_bandwidth_hz = 5000 * 1000;
+	
+	if(ad9361_init(&ad9361_phy, &default_init_param) < 0) {
+		printf("ad9361_init failed\n");
+		return 1;
+	}
+
+	assert(ad9361_set_tx_fir_config(ad9361_phy, tx_fir_config) >= 0);
+	assert(ad9361_set_rx_fir_config(ad9361_phy, rx_fir_config) >= 0);
+	assert(ad9361_set_rx_sampling_freq(ad9361_phy, 10 * 1000000) >= 0);
+	assert(ad9361_set_rx_fir_en_dis(ad9361_phy, ENABLE) >= 0);
 
 #ifdef FMCOMMS5
 #ifdef LINUX_PLATFORM
@@ -492,7 +518,7 @@ int main(void)
 #endif
 
 #ifdef CONSOLE_COMMANDS
-	get_help(NULL, 0);
+	get_help(nullptr, 0);
 
 	while(1)
 	{
@@ -650,5 +676,7 @@ int main(void)
 	}
 #endif
 
+	spi_deinit();
+	
 	return 0;
 }

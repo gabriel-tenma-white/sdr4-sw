@@ -418,7 +418,7 @@ int32_t ad9361_init (struct ad9361_rf_phy **ad9361_phy, AD9361_InitParam *init_p
 
 	ret = ad9361_spi_read(phy->spi, REG_PRODUCT_ID);
 	if ((ret & PRODUCT_ID_MASK) != PRODUCT_ID_9361) {
-		printf("%s : Unsupported PRODUCT_ID 0x%X", __func__, (unsigned int)ret);
+		printf("%s : Unsupported PRODUCT_ID 0x%X\n", __func__, (unsigned int)ret);
 		ret = -ENODEV;
 		goto out;
 	}
