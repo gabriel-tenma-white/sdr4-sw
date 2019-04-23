@@ -4347,12 +4347,12 @@ static int32_t ad9361_validate_trx_clock_chain(struct ad9361_rf_phy *phy,
 	}
 
 	for (i = 1; i <= 3; i++) {
-		if (abs(rx_path_clks[ADC_FREQ] / i - data_clk) < 4)
+		if (abs(int(rx_path_clks[ADC_FREQ]) / i - int(data_clk)) < 4)
 			return 0;
 	}
 
 	for (i = 1; i <= 4; i++) {
-		if (abs((rx_path_clks[R2_FREQ] >> i) - data_clk) < 4)
+		if (abs(int(rx_path_clks[R2_FREQ] >> i) - int(data_clk)) < 4)
 			return 0;
 	}
 

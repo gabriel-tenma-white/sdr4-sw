@@ -583,8 +583,9 @@ int32_t ad9361_post_setup(struct ad9361_rf_phy *phy)
 	struct axiadc_converter *conv = phy->adc_conv;
 	struct axiadc_state *st = phy->adc_state;
 	int32_t rx2tx2 = phy->pdata->rx2tx2;
-	int32_t tmp, num_chan, flags;
+	int32_t tmp, num_chan;
 	int32_t i, ret;
+	dig_tune_flags flags = (dig_tune_flags)0;
 
 	num_chan = ad9361_num_phy_chan(conv);
 
@@ -617,7 +618,7 @@ int32_t ad9361_post_setup(struct ad9361_rf_phy *phy)
 			ADI_ENABLE | ADI_IQCOR_ENB);
 	}
 
-	flags = 0x0;
+	flags = (dig_tune_flags)0x0;
 
 	ret = ad9361_dig_tune(phy, (axiadc_read(st, ADI_REG_ID)) ?
 		0 : 61440000, flags);
@@ -626,7 +627,7 @@ int32_t ad9361_post_setup(struct ad9361_rf_phy *phy)
 
 	if (flags & (DO_IDELAY | DO_ODELAY)) {
 		ret = ad9361_dig_tune(phy, (axiadc_read(st, ADI_REG_ID)) ?
-			0 : 61440000, flags & BE_VERBOSE);
+			0 : 61440000, dig_tune_flags(flags & BE_VERBOSE));
 		if (ret < 0)
 			return ret;
 	}
